@@ -63,29 +63,6 @@ type GroupedAppointment = {
 };
 
 type Customer = { id: number; name: string; whatsapp: string };
-import Select from "react-select";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-
-type Appointment = {
-  id: number;
-  date: string;
-  time: string;
-  customer: { id: number; name: string; whatsapp: string } | null;
-  treatments: { name: string } | null;
-  capsters: { name: string } | null;
-};
-
-type GroupedAppointment = {
-  id: string; // Combined ID for grouped appointments
-  date: string;
-  time: string;
-  customer: { id: number; name: string; whatsapp: string } | null;
-  treatments: string[]; // Array of treatment names
-  capsters: { name: string } | null;
-};
-
-type Customer = { id: number; name: string; whatsapp: string };
 
 export default function Home() {
   const [appointments, setAppointments] = useState<GroupedAppointment[]>([]);
