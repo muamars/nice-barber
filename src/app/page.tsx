@@ -30,13 +30,13 @@ import {
   Phone,
   RefreshCw,
   Calendar,
-  TrendingUp,
   Download,
   Loader2,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
   XCircle,
+  Edit,
 } from "lucide-react";
 import Logo from "@/assets/NICE.png";
 import Image from "next/image";
@@ -55,6 +55,7 @@ type Appointment = {
 
 type GroupedAppointment = {
   id: string; // Combined ID for grouped appointments
+  appointmentIds: number[]; // Array of actual appointment IDs for editing
   date: string;
   time: string;
   customer: { id: number; name: string; whatsapp: string } | null;
@@ -76,6 +77,10 @@ export default function Home() {
     message: string;
     exportedCount?: number;
   } | null>(null);
+  const [editingAppointmentId, setEditingAppointmentId] = useState<
+    number | number[] | null
+  >(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Force refresh key
 
   // Function to group appointments by customer, time, and capster
   function groupAppointments(
@@ -112,11 +117,13 @@ export default function Home() {
         // Add treatment to existing group
         if (appointment.treatments?.name) {
           grouped[existingGroup].treatments.push(appointment.treatments.name);
+          grouped[existingGroup].appointmentIds.push(appointment.id);
         }
       } else {
         // Create new group
         grouped[groupKey] = {
           id: groupKey,
+          appointmentIds: [appointment.id],
           date: appointment.date,
           time: appointment.time,
           customer: appointment.customer,
@@ -142,7 +149,10 @@ export default function Home() {
         const day = String(targetDate.getDate()).padStart(2, "0");
         const dateParam = `${year}-${month}-${day}`;
 
-        const res = await fetch(`/api/appointments?date=${dateParam}`);
+        console.log("Loading appointments for date:", dateParam);
+        const res = await fetch(
+          `/api/appointments?date=${dateParam}&t=${Date.now()}`
+        );
         const data = await res.json();
 
         // Handle both direct array and wrapped responses
@@ -150,14 +160,24 @@ export default function Home() {
           ? data
           : data.value || data.data || [];
 
+        console.log("Raw appointments from API:", rawAppointments);
         const groupedAppointments = groupAppointments(rawAppointments);
-        setAppointments(groupedAppointments);
+        console.log("Grouped appointments:", groupedAppointments);
+
+        // Force state update
+        setAppointments(() => {
+          console.log("Force updating appointments state");
+          return groupedAppointments;
+        });
+
+        // Force refresh key update
+        setRefreshKey((prev) => prev + 1);
       } catch (error) {
         console.error("Error loading appointments:", error);
         setAppointments([]);
       }
     },
-    [selectedDate]
+    [selectedDate] // Remove appointments dependency to fix warning
   );
 
   const handleExport = useCallback(async () => {
@@ -203,6 +223,11 @@ export default function Home() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Debug: Monitor appointments state changes
+  useEffect(() => {
+    console.log("Appointments state changed:", appointments);
+  }, [appointments]);
 
   // Initialize time on client-side only and update every second
   useEffect(() => {
@@ -256,21 +281,21 @@ export default function Home() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8">
+        {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 lg:mb-8">
           <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white transform hover:scale-105 transition-all duration-300">
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 font-medium text-xs sm:text-sm">
+                  <p className="text-blue-100 font-medium text-sm sm:text-base">
                     Total Customer
                   </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold">
+                  <p className="text-2xl sm:text-3xl lg:text-4xl font-bold">
                     {appointments.length}
                   </p>
-                  <p className="text-blue-200 text-xs mt-1">Hari ini</p>
+                  <p className="text-blue-200 text-sm mt-1">Hari ini</p>
                 </div>
-                <div className="bg-white/20 p-2 lg:p-3 rounded-xl lg:rounded-2xl">
-                  <User className="w-4 h-4 lg:w-6 lg:h-6" />
+                <div className="bg-white/20 p-3 lg:p-4 rounded-xl lg:rounded-2xl">
+                  <User className="w-5 h-5 lg:w-7 lg:h-7" />
                 </div>
               </div>
             </CardContent>
@@ -280,7 +305,7 @@ export default function Home() {
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-emerald-100 font-medium text-xs sm:text-sm">
+                  <p className="text-emerald-100 font-medium text-sm sm:text-base">
                     Appointment Terakhir
                   </p>
                   <p className="text-xl sm:text-2xl lg:text-3xl font-bold">
@@ -295,7 +320,7 @@ export default function Home() {
                         })()
                       : "-"}
                   </p>
-                  <p className="text-emerald-200 text-xs mt-1 truncate max-w-[100px] sm:max-w-none">
+                  <p className="text-emerald-200 text-sm mt-1 truncate max-w-[120px] sm:max-w-none">
                     {appointments.length > 0
                       ? (() => {
                           // Find appointment with latest time (ascending order)
@@ -310,8 +335,8 @@ export default function Home() {
                       : "Belum ada"}
                   </p>
                 </div>
-                <div className="bg-white/20 p-2 lg:p-3 rounded-xl lg:rounded-2xl">
-                  <Clock className="w-4 h-4 lg:w-6 lg:h-6" />
+                <div className="bg-white/20 p-3 lg:p-4 rounded-xl lg:rounded-2xl">
+                  <Clock className="w-5 h-5 lg:w-7 lg:h-7" />
                 </div>
               </div>
             </CardContent>
@@ -321,7 +346,7 @@ export default function Home() {
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 font-medium text-xs sm:text-sm">
+                  <p className="text-purple-100 font-medium text-sm sm:text-base">
                     Total Treatment
                   </p>
                   <p className="text-xl sm:text-2xl lg:text-3xl font-bold">
@@ -331,12 +356,12 @@ export default function Home() {
                       0
                     )}
                   </p>
-                  <p className="text-purple-200 text-xs mt-1">
+                  <p className="text-purple-200 text-sm mt-1">
                     Dilakukan hari ini
                   </p>
                 </div>
-                <div className="bg-white/20 p-2 lg:p-3 rounded-xl lg:rounded-2xl">
-                  <Scissors className="w-4 h-4 lg:w-6 lg:h-6" />
+                <div className="bg-white/20 p-3 lg:p-4 rounded-xl lg:rounded-2xl">
+                  <Scissors className="w-5 h-5 lg:w-7 lg:h-7" />
                 </div>
               </div>
             </CardContent>
@@ -346,7 +371,7 @@ export default function Home() {
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="text-amber-100 font-medium text-xs sm:text-sm">
+                  <p className="text-amber-100 font-medium text-sm sm:text-base">
                     Treatment Favorit
                   </p>
                   {(() => {
@@ -369,7 +394,7 @@ export default function Home() {
                           <p className="text-xl sm:text-2xl lg:text-3xl font-bold">
                             {mostPopular[1]}
                           </p>
-                          <p className="text-amber-200 text-xs mt-1 truncate max-w-[150px] sm:max-w-none">
+                          <p className="text-amber-200 text-sm mt-1 truncate max-w-[170px] sm:max-w-none">
                             {mostPopular[0]}
                           </p>
                         </>
@@ -378,7 +403,7 @@ export default function Home() {
                       return (
                         <>
                           <p className="text-xl font-bold">-</p>
-                          <p className="text-amber-200 text-xs mt-1">
+                          <p className="text-amber-200 text-sm mt-1">
                             Belum ada data
                           </p>
                         </>
@@ -386,8 +411,32 @@ export default function Home() {
                     }
                   })()}
                 </div>
-                <div className="bg-white/20 p-2 lg:p-3 rounded-xl lg:rounded-2xl">
-                  <TrendingUp className="w-4 h-4 lg:w-6 lg:h-6" />
+                <div className="bg-white/20 p-3 lg:p-4 rounded-xl lg:rounded-2xl">
+                  <TrendingUp className="w-5 h-5 lg:w-7 lg:h-7" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div> */}
+
+        {/* Welcome Section */}
+        <div className="mb-4 lg:mb-6">
+          <Card className="border-0 shadow-md bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white overflow-hidden relative">
+            <CardContent className="p-3 sm:p-4 relative">
+              <div className="flex items-center justify-between gap-3 px-4">
+                <div className="flex-1">
+                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-1 text-white">
+                    Selamat Bekerja Caps👋
+                  </h1>
+                  <p className="text-blue-100 text-xs sm:text-sm leading-relaxed">
+                    Jangan lupa isi datanya ya!
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg">
+                    <Scissors className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -398,11 +447,11 @@ export default function Home() {
         <Card className="border-0 shadow-xl bg-white">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl lg:text-2xl font-bold text-slate-900 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex md:w-full lg:w-0 items-center justify-between gap-3">
                 <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-2 rounded-xl">
                   <Scissors className="w-4 h-4 lg:w-5 lg:h-5 text-blue-700" />
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between md:w-full lg:w-full items-center">
                   <div className="flex flex-col">
                     <div>Appointment</div>
                     <div className="text-sm font-normal text-slate-600">
@@ -428,11 +477,8 @@ export default function Home() {
 
               <div className="w-full lg:w-auto flex flex-col md:flex-row gap-3 md:items-center">
                 {/* Date Picker */}
-                <div className="flex items-center gap-2 sm:gap-3 bg-slate-50 px-2 sm:px-3 py-2 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-2 sm:gap-3 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
                   <Calendar className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                  <Label className="text-xs sm:text-sm font-medium text-slate-700 whitespace-nowrap">
-                    Pilih Tanggal
-                  </Label>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
@@ -443,10 +489,10 @@ export default function Home() {
                         setSelectedDate(yesterday);
                         load(yesterday);
                       }}
-                      className="h-7 w-7 p-0 text-xs"
+                      className="h-9 w-9 p-0 text-sm"
                       title="Hari sebelumnya"
                     >
-                      <ChevronLeft className="w-3 h-3" />
+                      <ChevronLeft className="w-4 h-4" />
                     </Button>
                     <DatePicker
                       selected={selectedDate}
@@ -457,7 +503,7 @@ export default function Home() {
                         }
                       }}
                       dateFormat="dd/MM/yyyy"
-                      className="p-1 sm:p-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm w-20 sm:w-24 bg-white text-center"
+                      className="p-2.5 border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base w-28 md:w-32 bg-white text-center"
                       maxDate={new Date()}
                       placeholderText="Pilih tanggal"
                     />
@@ -476,130 +522,149 @@ export default function Home() {
                         selectedDate.toDateString() ===
                         new Date().toDateString()
                       }
-                      className="h-7 w-7 p-0 text-xs"
+                      className="h-9 w-9 p-0 text-sm"
                       title="Hari berikutnya"
                     >
-                      <ChevronRight className="w-3 h-3" />
+                      <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="w-full lg:w-auto flex flex-col md:flex-row gap-3 md:items-center">
+                <div className="w-full md:w-auto flex flex-col md:flex-row gap-3">
                   {/* Export Button */}
                   <Button
                     onClick={handleExport}
                     variant="outline"
                     size="sm"
                     disabled={isExporting}
-                    className="border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm font-semibold text-xs sm:text-sm"
+                    className="border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm font-semibold text-sm md:text-base py-3 px-4 md:py-2.5 min-h-[44px]"
                   >
                     {isExporting ? (
-                      <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
-                      <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      <Download className="w-4 h-4 mr-2" />
                     )}
-                    <span className="hidden sm:inline">Export to Sheets</span>
-                    <span className="sm:hidden">Export</span>
+                    <span className="md:hidden">Export to Sheets</span>
+                    <span className="hidden md:inline">Export to Sheets</span>
                   </Button>
 
-                  <Dialog open={showAdd} onOpenChange={setShowAdd}>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transform hover:scale-105 transition-all duration-200"
-                      >
-                        <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                        <span className="hidden sm:inline">
-                          Tambah Appointment
-                        </span>
-                        <span className="sm:hidden">Tambah</span>
-                      </Button>
-                    </DialogTrigger>
-                    <AddAppointmentModal
-                      onClose={() => {
-                        setShowAdd(false);
-                        load();
-                      }}
-                    />
-                  </Dialog>
-
-                  {/* Export Result Modal */}
-                  <Dialog
-                    open={showExportResult}
-                    onOpenChange={setShowExportResult}
-                  >
-                    <DialogContent className="sm:max-w-md max-w-[95vw] mx-4">
-                      <DialogHeader>
-                        <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-3">
-                          <div
-                            className={`p-2 rounded-xl ${
-                              exportResult?.success
-                                ? "bg-green-100"
-                                : "bg-red-100"
-                            }`}
-                          >
-                            {exportResult?.success ? (
-                              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
-                            ) : (
-                              <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
-                            )}
-                          </div>
-                          <span className="text-base sm:text-lg">
-                            {exportResult?.success
-                              ? "Export Berhasil"
-                              : "Export Gagal"}
-                          </span>
-                        </DialogTitle>
-                      </DialogHeader>
-
-                      <div className="py-4">
-                        <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                          {exportResult?.message}
-                        </p>
-                        {exportResult?.success &&
-                          exportResult?.exportedCount !== undefined && (
-                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <div className="bg-green-100 p-1.5 rounded-md">
-                                  <User className="w-3.5 h-3.5 text-green-600" />
-                                </div>
-                                <span className="text-sm font-medium text-green-900">
-                                  {exportResult.exportedCount} appointment
-                                  berhasil diekspor
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                      </div>
-
-                      <DialogFooter>
+                  {/* Add Appointment and Refresh buttons */}
+                  <div className="flex items-center gap-3">
+                    <Dialog open={showAdd} onOpenChange={setShowAdd}>
+                      <DialogTrigger asChild>
                         <Button
-                          onClick={() => setShowExportResult(false)}
-                          className={`w-full sm:w-auto ${
-                            exportResult?.success
-                              ? "bg-green-600 hover:bg-green-700"
-                              : "bg-red-600 hover:bg-red-700"
-                          } text-white`}
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg px-4 md:px-6 py-3 md:py-2.5 text-sm md:text-base font-semibold rounded-lg transform hover:scale-105 transition-all duration-200 flex-1 md:flex-none min-h-[44px]"
                         >
-                          Tutup
+                          <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2 md:mr-3" />
+                          <span className="md:hidden">Tambah Appointment</span>
+                          <span className="hidden md:inline">
+                            Tambah Appointment
+                          </span>
                         </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                  <button
-                    onClick={() => load()}
-                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors hidden lg:block"
-                    title="Reload data"
-                  >
-                    <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
-                  </button>
+                      </DialogTrigger>
+                      <AddAppointmentModal
+                        onClose={() => {
+                          console.log(
+                            "onClose callback called in Home component"
+                          );
+                          setShowAdd(false);
+                          setEditingAppointmentId(null);
+                          load();
+                        }}
+                        editingAppointmentId={editingAppointmentId}
+                      />
+                    </Dialog>
+
+                    <button
+                      onClick={() => load()}
+                      className="lg:block hidden p-3 md:p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors min-h-[44px] md:min-h-auto"
+                      title="Reload data"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Export Result Modal */}
+                <Dialog
+                  open={showExportResult}
+                  onOpenChange={setShowExportResult}
+                >
+                  <DialogContent className="sm:max-w-md max-w-[95vw] mx-4">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-xl ${
+                            exportResult?.success
+                              ? "bg-green-100"
+                              : "bg-red-100"
+                          }`}
+                        >
+                          {exportResult?.success ? (
+                            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                          ) : (
+                            <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
+                          )}
+                        </div>
+                        <span className="text-base sm:text-lg">
+                          {exportResult?.success
+                            ? "Export Berhasil"
+                            : "Export Gagal"}
+                        </span>
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                      <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+                        {exportResult?.message}
+                      </p>
+                      {exportResult?.success &&
+                        exportResult?.exportedCount !== undefined && (
+                          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <div className="bg-green-100 p-1.5 rounded-md">
+                                <User className="w-3.5 h-3.5 text-green-600" />
+                              </div>
+                              <span className="text-sm font-medium text-green-900">
+                                {exportResult.exportedCount} appointment
+                                berhasil diekspor
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        onClick={() => setShowExportResult(false)}
+                        className={`w-full sm:w-auto ${
+                          exportResult?.success
+                            ? "bg-green-600 hover:bg-green-700"
+                            : "bg-red-600 hover:bg-red-700"
+                        } text-white`}
+                      >
+                        Tutup
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AppointmentTable items={appointments} />
+            <AppointmentTable
+              key={`appointments-${refreshKey}`}
+              items={appointments}
+              onEditAppointment={(groupedAppointment) => {
+                console.log("Editing grouped appointment:", groupedAppointment);
+
+                // Set the appointment IDs for editing and open modal
+                setEditingAppointmentId(groupedAppointment.appointmentIds);
+                setShowAdd(true);
+              }}
+            />
           </CardContent>
         </Card>
       </div>
@@ -607,7 +672,13 @@ export default function Home() {
   );
 }
 
-function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
+function AppointmentTable({
+  items,
+  onEditAppointment,
+}: {
+  items: GroupedAppointment[];
+  onEditAppointment: (appointment: GroupedAppointment) => void;
+}) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -646,20 +717,23 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50 hover:bg-slate-50">
-                <TableHead className="font-semibold text-slate-700 min-w-[100px]">
+                <TableHead className="font-semibold text-slate-700 min-w-[100px] text-sm sm:text-base py-4">
                   Waktu
                 </TableHead>
-                <TableHead className="font-semibold text-slate-700 min-w-[120px]">
+                <TableHead className="font-semibold text-slate-700 min-w-[120px] text-sm sm:text-base py-4">
                   Customer
                 </TableHead>
-                <TableHead className="font-semibold text-slate-700 min-w-[120px] hidden sm:table-cell">
+                <TableHead className="font-semibold text-slate-700 min-w-[120px] hidden sm:table-cell text-sm sm:text-base py-4">
                   Whatsapp
                 </TableHead>
-                <TableHead className="font-semibold text-slate-700 min-w-[150px]">
+                <TableHead className="font-semibold text-slate-700 min-w-[150px] text-sm sm:text-base py-4">
                   Treatment
                 </TableHead>
-                <TableHead className="font-semibold text-slate-700 min-w-[100px] hidden md:table-cell">
+                <TableHead className="font-semibold text-slate-700 min-w-[100px] hidden md:table-cell text-sm sm:text-base py-4">
                   Capster
+                </TableHead>
+                <TableHead className="font-semibold text-slate-700 min-w-[80px] text-sm sm:text-base py-4">
+                  Action
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -671,13 +745,13 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
                     index % 2 === 0 ? "bg-white" : "bg-slate-25"
                   }`}
                 >
-                  <TableCell className="font-semibold text-slate-900">
+                  <TableCell className="font-semibold text-slate-900 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="bg-blue-100 p-1.5 rounded-md">
-                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                      <div className="bg-blue-100 p-2 rounded-md">
+                        <Clock className="w-4 h-4 text-blue-600" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs sm:text-sm font-light">
+                        <span className="text-sm sm:text-base font-light">
                           {appointment.date}
                         </span>
                         <span className="text-sm sm:text-base">
@@ -686,35 +760,35 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium text-slate-900">
+                  <TableCell className="font-medium text-slate-900 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="bg-emerald-100 p-1.5 rounded-md">
-                        <User className="w-3.5 h-3.5 text-emerald-600" />
+                      <div className="bg-emerald-100 p-2 rounded-md">
+                        <User className="w-4 h-4 text-emerald-600" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm sm:text-base font-medium truncate">
                           {appointment.customer?.name ?? "-"}
                         </p>
-                        <p className="text-xs text-slate-600 sm:hidden truncate">
+                        <p className="text-sm text-slate-600 sm:hidden truncate">
                           {appointment.customer?.whatsapp ?? "-"}
                         </p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-slate-600 hidden sm:table-cell">
+                  <TableCell className="text-slate-600 hidden sm:table-cell py-4">
                     <div className="flex items-center gap-2">
-                      <div className="bg-purple-100 p-1.5 rounded-md">
-                        <Phone className="w-3.5 h-3.5 text-purple-600" />
+                      <div className="bg-purple-100 p-2 rounded-md">
+                        <Phone className="w-4 h-4 text-purple-600" />
                       </div>
-                      <span className="text-sm">
+                      <span className="text-sm sm:text-base">
                         {appointment.customer?.whatsapp ?? "-"}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell className="text-slate-600 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="bg-amber-100 p-1.5 rounded-md mt-0.5">
-                        <Scissors className="w-3.5 h-3.5 text-amber-600" />
+                      <div className="bg-amber-100 p-2 rounded-md mt-0.5">
+                        <Scissors className="w-4 h-4 text-amber-600" />
                       </div>
                       <div className="flex flex-wrap gap-1 min-w-0 flex-1">
                         {appointment.treatments &&
@@ -722,7 +796,7 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
                           ? appointment.treatments.map((treatment, idx) => (
                               <span
                                 key={idx}
-                                className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-md text-xs font-medium truncate max-w-[120px] sm:max-w-none"
+                                className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-md text-sm font-medium truncate max-w-[140px] sm:max-w-none"
                                 title={treatment}
                               >
                                 {treatment}
@@ -733,23 +807,34 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
                     </div>
                     {/* Show capster in mobile when capster column is hidden */}
                     <div className="md:hidden mt-2 flex items-center gap-2">
-                      <div className="bg-indigo-100 p-1 rounded">
-                        <User className="w-3 h-3 text-indigo-600" />
+                      <div className="bg-indigo-100 p-1.5 rounded">
+                        <User className="w-3.5 h-3.5 text-indigo-600" />
                       </div>
-                      <span className="text-xs text-slate-600">
+                      <span className="text-sm text-slate-600">
                         {appointment.capsters?.name ?? "-"}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-slate-600 hidden md:table-cell">
+                  <TableCell className="text-slate-600 hidden md:table-cell py-4">
                     <div className="flex items-center gap-2">
-                      <div className="bg-indigo-100 p-1.5 rounded-md">
-                        <User className="w-3.5 h-3.5 text-indigo-600" />
+                      <div className="bg-indigo-100 p-2 rounded-md">
+                        <User className="w-4 h-4 text-indigo-600" />
                       </div>
-                      <span className="text-sm">
+                      <span className="text-sm sm:text-base">
                         {appointment.capsters?.name ?? "-"}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell className="py-4">
+                    <Button
+                      onClick={() => onEditAppointment(appointment)}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-9 p-0 border-blue-200 text-blue-600 hover:bg-blue-50"
+                      title="Edit appointment"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -761,7 +846,7 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-2">
-          <div className="text-sm text-slate-600">
+          <div className="text-sm sm:text-base text-slate-600">
             Menampilkan {startIndex + 1}-{Math.min(endIndex, items.length)} dari{" "}
             {items.length} appointment
           </div>
@@ -827,7 +912,13 @@ function AppointmentTable({ items }: { items: GroupedAppointment[] }) {
   );
 }
 
-function AddAppointmentModal({ onClose }: { onClose: () => void }) {
+function AddAppointmentModal({
+  onClose,
+  editingAppointmentId,
+}: {
+  onClose: () => void;
+  editingAppointmentId?: number | number[] | null;
+}) {
   const [capsters, setCapsters] = useState<{ id: number; name: string }[]>([]);
   const [treatments, setTreatments] = useState<{ id: number; name: string }[]>(
     []
@@ -844,9 +935,12 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
   const [newCustomerWhatsapp, setNewCustomerWhatsapp] = useState("");
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerValidationError, setCustomerValidationError] = useState("");
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Enhanced close function that resets form
   const handleClose = () => {
+    console.log("handleClose called in AddAppointmentModal");
     // Reset all form state
     setSelectedCapster("");
     setSelectedTreatments([]);
@@ -857,17 +951,73 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
     setNewCustomerName("");
     setNewCustomerWhatsapp("");
     setCustomerValidationError("");
+    setShowConfirmation(false);
+    setIsEditMode(false);
     onClose();
   };
 
   useEffect(() => {
+    // Fetch masters data when component mounts or when returning from confirmation
     fetch("/api/masters")
       .then((r) => r.json())
       .then((d) => {
         setTreatments(d.treatments || []);
         setCapsters(d.capsters || []);
       });
-  }, []);
+  }, [showConfirmation]); // Re-fetch when showConfirmation changes
+
+  // Load appointment data for editing when editingAppointmentId is set
+  useEffect(() => {
+    async function loadEditData() {
+      if (editingAppointmentId) {
+        try {
+          // Handle both single ID and array of IDs
+          const appointmentIds = Array.isArray(editingAppointmentId)
+            ? editingAppointmentId
+            : [editingAppointmentId];
+
+          // Load the first appointment as template for form data
+          const res = await fetch(`/api/appointments/${appointmentIds[0]}`);
+          if (res.ok) {
+            const appointment = await res.json();
+
+            // Set customer and capster data from first appointment
+            setSelectedCustomer(appointment.customer);
+            setSelectedCapster(appointment.capsters.id.toString());
+
+            // For multiple appointments, load all treatments
+            if (appointmentIds.length > 1) {
+              // Load all appointments to get all treatments
+              const allAppointments = await Promise.all(
+                appointmentIds.map((id) =>
+                  fetch(`/api/appointments/${id}`).then((r) => r.json())
+                )
+              );
+
+              // Extract unique treatment IDs
+              const treatmentIds = allAppointments
+                .map((apt) => apt.treatments.id.toString())
+                .filter((id, index, arr) => arr.indexOf(id) === index); // unique
+
+              setSelectedTreatments(treatmentIds);
+            } else {
+              // Single appointment
+              setSelectedTreatments([appointment.treatments.id.toString()]);
+            }
+
+            setIsEditMode(true);
+          }
+        } catch (error) {
+          console.error("Error loading appointment for edit:", error);
+        }
+      } else {
+        // Reset edit mode when no editingAppointmentId
+        setIsEditMode(false);
+      }
+    }
+
+    loadEditData();
+  }, [editingAppointmentId]);
 
   useEffect(() => {
     if (!customerQuery) {
@@ -954,124 +1104,178 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
     )
       return;
 
-    // Create multiple appointments, one for each selected treatment
-    const appointmentPromises = selectedTreatments.map((treatmentId) =>
-      fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer_id: selectedCustomer.id,
-          treatment_id: Number(treatmentId),
-          capster_id: Number(selectedCapster),
-        }),
-      })
-    );
+    try {
+      if (
+        isEditMode &&
+        editingAppointmentId &&
+        Array.isArray(editingAppointmentId)
+      ) {
+        // Edit multiple appointments in the group
+        // First, delete all existing appointments in the group
+        const deletePromises = editingAppointmentId.map((id: number) =>
+          fetch(`/api/appointments/${id}`, {
+            method: "DELETE",
+          })
+        );
 
-    await Promise.all(appointmentPromises);
-    handleClose();
+        await Promise.all(deletePromises);
+        console.log("Deleted existing appointments:", editingAppointmentId);
+
+        // Then create new appointments for selected treatments
+        const createPromises = selectedTreatments.map((treatmentId) =>
+          fetch("/api/appointments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              customer_id: selectedCustomer.id,
+              treatment_id: Number(treatmentId),
+              capster_id: Number(selectedCapster),
+            }),
+          })
+        );
+
+        const results = await Promise.all(createPromises);
+        const hasErrors = results.some((res) => !res.ok);
+
+        if (!hasErrors) {
+          console.log("Appointments updated successfully");
+          setShowConfirmation(true);
+        } else {
+          console.error("Some appointments failed to update");
+          alert("Gagal mengupdate beberapa appointment");
+        }
+      } else if (
+        isEditMode &&
+        editingAppointmentId &&
+        typeof editingAppointmentId === "number"
+      ) {
+        // Edit single appointment (legacy case)
+        const treatmentId = selectedTreatments[0];
+
+        const res = await fetch(`/api/appointments/${editingAppointmentId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customer_id: selectedCustomer.id,
+            treatment_id: Number(treatmentId),
+            capster_id: Number(selectedCapster),
+          }),
+        });
+
+        if (res.ok) {
+          console.log("Appointment updated successfully");
+          setShowConfirmation(true);
+        } else {
+          const errorData = await res.json();
+          console.error("Failed to update appointment:", errorData);
+          alert(
+            "Gagal mengupdate appointment: " +
+              (errorData.error || "Unknown error")
+          );
+        }
+      } else {
+        // Create multiple appointments, one for each selected treatment
+        const appointmentPromises = selectedTreatments.map((treatmentId) =>
+          fetch("/api/appointments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              customer_id: selectedCustomer.id,
+              treatment_id: Number(treatmentId),
+              capster_id: Number(selectedCapster),
+            }),
+          })
+        );
+
+        const results = await Promise.all(appointmentPromises);
+        const hasErrors = results.some((res) => !res.ok);
+
+        if (!hasErrors) {
+          console.log("Appointments created successfully");
+          setShowConfirmation(true);
+        } else {
+          console.error("Some appointments failed to create");
+          alert("Gagal membuat beberapa appointment");
+        }
+      }
+    } catch (error) {
+      console.error("Error in handleSubmit:", error);
+      alert("Terjadi kesalahan: " + error);
+    }
+  }
+
+  // Fungsi untuk button "Edit/Tambah" - reset form untuk appointment baru atau tetap di mode edit
+  function handleEditOrAdd() {
+    setShowConfirmation(false);
+
+    if (isEditMode) {
+      // Jika dalam mode edit, biarkan data tetap ada untuk kemudahan edit lebih lanjut
+      // User bisa edit lagi appointment yang sama
+    } else {
+      // Jika mode tambah baru, reset form kecuali customer (untuk kemudahan user)
+      setSelectedTreatments([]);
+      setSelectedCapster("");
+      // Biarkan customer tetap terpilih untuk kemudahan
+    }
+  }
+
+  // Fungsi untuk button "Selesai" - tutup modal dan reload data
+  function handleFinish() {
+    console.log("handleFinish called");
+    // Tambahkan delay kecil untuk memastikan database sudah ter-update
+    setTimeout(() => {
+      handleClose();
+    }, 500); // Increase delay to 500ms
   }
 
   return (
     <DialogContent className="sm:max-w-2xl max-w-[95vw] w-full max-h-[95vh] overflow-y-auto z-50 sm:mx-auto">
-      <DialogHeader>
-        <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
-          <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-2 rounded-xl">
-            <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-blue-700" />
-          </div>
-          <span className="text-base sm:text-xl">Tambah Appointment Baru</span>
-        </DialogTitle>
-        <DialogDescription className="text-sm sm:text-base text-slate-600">
-          Masukkan detail appointment untuk pelanggan baru
-        </DialogDescription>
-      </DialogHeader>
+      {!showConfirmation ? (
+        // Form untuk tambah appointment
+        <>
+          <DialogHeader>
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
+              <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-2 rounded-xl">
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-blue-700" />
+              </div>
+              <span className="text-base sm:text-xl">
+                {isEditMode ? "Edit Appointment" : "Tambah Appointment Baru"}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-slate-600">
+              {isEditMode
+                ? "Edit detail appointment yang sudah ada"
+                : "Masukkan detail appointment untuk pelanggan baru"}
+            </DialogDescription>
+          </DialogHeader>
 
-      <div className="space-y-4 sm:space-y-6 py-4">
-        {/* Capster Selection */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="capster"
-            className="text-sm font-semibold text-slate-700"
-          >
-            Pilih Capster
-          </Label>
-          <Select
-            value={
-              capsters.find((c) => c.id.toString() === selectedCapster)
-                ? {
-                    value: selectedCapster,
-                    label: capsters.find(
-                      (c) => c.id.toString() === selectedCapster
-                    )?.name,
-                  }
-                : null
-            }
-            onChange={(option) => setSelectedCapster(option?.value || "")}
-            options={capsters.map((capster) => ({
-              value: capster.id.toString(),
-              label: capster.name,
-            }))}
-            placeholder=""
-            isSearchable
-            className="react-select-container"
-            classNamePrefix="react-select"
-            styles={{
-              menuPortal: (provided) => ({
-                ...provided,
-                zIndex: 9999,
-              }),
-              menu: (provided) => ({
-                ...provided,
-                zIndex: 9999,
-                fontSize: "16px",
-              }),
-              control: (provided) => ({
-                ...provided,
-                minHeight: "48px",
-                fontSize: "16px",
-              }),
-            }}
-            menuPortalTarget={null}
-          />
-        </div>
-
-        {/* Customer Selection */}
-        <div className="space-y-4">
-          <Label className="text-sm font-semibold text-slate-700">
-            Customer
-          </Label>
-
-          {!addingCustomer ? (
-            <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-6 py-4">
+            {/* Capster Selection */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="capster"
+                className="text-sm font-semibold text-slate-700"
+              >
+                Pilih Capster
+              </Label>
               <Select
                 value={
-                  selectedCustomer
+                  capsters.find((c) => c.id.toString() === selectedCapster)
                     ? {
-                        value: selectedCustomer.id.toString(),
-                        label: `${selectedCustomer.name} (${selectedCustomer.whatsapp})`,
+                        value: selectedCapster,
+                        label: capsters.find(
+                          (c) => c.id.toString() === selectedCapster
+                        )?.name,
                       }
                     : null
                 }
-                onChange={(option) => {
-                  if (option) {
-                    const customer = customers.find(
-                      (c) => c.id.toString() === option.value
-                    );
-                    if (customer) {
-                      setSelectedCustomer(customer);
-                    }
-                  } else {
-                    setSelectedCustomer(null);
-                  }
-                }}
-                onInputChange={(inputValue) => setCustomerQuery(inputValue)}
-                options={customers.map((customer) => ({
-                  value: customer.id.toString(),
-                  label: `${customer.name} (${customer.whatsapp})`,
+                onChange={(option) => setSelectedCapster(option?.value || "")}
+                options={capsters.map((capster) => ({
+                  value: capster.id.toString(),
+                  label: capster.name,
                 }))}
                 placeholder=""
                 isSearchable
-                isClearable
-                isLoading={loadingCustomers}
                 className="react-select-container"
                 classNamePrefix="react-select"
                 styles={{
@@ -1091,224 +1295,373 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                   }),
                 }}
                 menuPortalTarget={null}
-                noOptionsMessage={({ inputValue }) =>
-                  inputValue
-                    ? `Tidak ditemukan "${inputValue}"`
-                    : "Cari customer"
-                }
               />
+            </div>
 
-              {selectedCustomer && (
-                <Card className="border-green-200 bg-green-50">
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-green-100 p-2 rounded-full">
-                        <User className="w-4 h-4 text-green-700" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-green-900 text-sm sm:text-base">
-                          {selectedCustomer.name}
+            {/* Customer Selection */}
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold text-slate-700">
+                Customer
+              </Label>
+
+              {!addingCustomer ? (
+                <div className="space-y-4">
+                  <Select
+                    value={
+                      selectedCustomer
+                        ? {
+                            value: selectedCustomer.id.toString(),
+                            label: `${selectedCustomer.name} (${selectedCustomer.whatsapp})`,
+                          }
+                        : null
+                    }
+                    onChange={(option) => {
+                      if (option) {
+                        const customer = customers.find(
+                          (c) => c.id.toString() === option.value
+                        );
+                        if (customer) {
+                          setSelectedCustomer(customer);
+                        }
+                      } else {
+                        setSelectedCustomer(null);
+                      }
+                    }}
+                    onInputChange={(inputValue) => setCustomerQuery(inputValue)}
+                    options={customers.map((customer) => ({
+                      value: customer.id.toString(),
+                      label: `${customer.name} (${customer.whatsapp})`,
+                    }))}
+                    placeholder=""
+                    isSearchable
+                    isClearable
+                    isLoading={loadingCustomers}
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                    styles={{
+                      menuPortal: (provided) => ({
+                        ...provided,
+                        zIndex: 9999,
+                      }),
+                      menu: (provided) => ({
+                        ...provided,
+                        zIndex: 9999,
+                        fontSize: "16px",
+                      }),
+                      control: (provided) => ({
+                        ...provided,
+                        minHeight: "48px",
+                        fontSize: "16px",
+                      }),
+                    }}
+                    menuPortalTarget={null}
+                    noOptionsMessage={({ inputValue }) =>
+                      inputValue
+                        ? `Tidak ditemukan "${inputValue}"`
+                        : "Cari customer"
+                    }
+                  />
+
+                  {selectedCustomer && (
+                    <Card className="border-green-200 bg-green-50">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-green-100 p-2 rounded-full">
+                            <User className="w-4 h-4 text-green-700" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-green-900 text-sm sm:text-base">
+                              {selectedCustomer.name}
+                            </p>
+                            <p className="text-xs sm:text-sm text-green-700">
+                              {selectedCustomer.whatsapp}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setAddingCustomer(true)}
+                      className="flex items-center justify-center gap-2 text-base h-12 min-h-[48px]"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Tambah Customer Baru
+                    </Button>
+                    {selectedCustomer && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setSelectedCustomer(null)}
+                        className="text-base h-12 min-h-[48px]"
+                      >
+                        Reset Pilihan
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-3 sm:p-4 space-y-4">
+                    {/* Validation Error Display */}
+                    {customerValidationError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-xs sm:text-sm text-red-700 font-medium">
+                          {customerValidationError}
                         </p>
-                        <p className="text-xs sm:text-sm text-green-700">
-                          {selectedCustomer.whatsapp}
-                        </p>
                       </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="customer-name"
+                        className="text-sm font-medium text-blue-900"
+                      >
+                        Nama Customer
+                      </Label>
+                      <Input
+                        id="customer-name"
+                        placeholder="Masukkan nama lengkap"
+                        value={newCustomerName}
+                        onChange={(e) => {
+                          setNewCustomerName(e.target.value);
+                          if (customerValidationError)
+                            setCustomerValidationError("");
+                        }}
+                        className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        autoComplete="given-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="customer-whatsapp"
+                        className="text-sm font-medium text-blue-900"
+                      >
+                        Nomor Whatsapp
+                      </Label>
+                      <Input
+                        id="customer-whatsapp"
+                        placeholder="08xxxxxxxxxx"
+                        value={newCustomerWhatsapp}
+                        onChange={(e) => {
+                          setNewCustomerWhatsapp(e.target.value);
+                          if (customerValidationError)
+                            setCustomerValidationError("");
+                        }}
+                        className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        type="tel"
+                        autoComplete="tel"
+                        inputMode="numeric"
+                      />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        onClick={handleAddCustomer}
+                        disabled={
+                          !newCustomerName.trim() || !newCustomerWhatsapp.trim()
+                        }
+                        className="bg-blue-600 hover:bg-blue-700 text-base h-12 min-h-[48px]"
+                      >
+                        Simpan Customer
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setAddingCustomer(false);
+                          setNewCustomerName("");
+                          setNewCustomerWhatsapp("");
+                          setCustomerValidationError("");
+                        }}
+                        className="text-base h-12 min-h-[48px]"
+                      >
+                        Batal
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
               )}
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setAddingCustomer(true)}
-                  className="flex items-center justify-center gap-2 text-base h-12 min-h-[48px]"
-                >
-                  <Plus className="w-4 h-4" />
-                  Tambah Customer Baru
-                </Button>
-                {selectedCustomer && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedCustomer(null)}
-                    className="text-base h-12 min-h-[48px]"
-                  >
-                    Reset Pilihan
-                  </Button>
-                )}
-              </div>
             </div>
-          ) : (
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="p-3 sm:p-4 space-y-4">
-                {/* Validation Error Display */}
-                {customerValidationError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-xs sm:text-sm text-red-700 font-medium">
-                      {customerValidationError}
-                    </p>
-                  </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="customer-name"
-                    className="text-sm font-medium text-blue-900"
-                  >
-                    Nama Customer
-                  </Label>
-                  <Input
-                    id="customer-name"
-                    placeholder="Masukkan nama lengkap"
-                    value={newCustomerName}
-                    onChange={(e) => {
-                      setNewCustomerName(e.target.value);
-                      if (customerValidationError)
-                        setCustomerValidationError("");
-                    }}
-                    className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    autoComplete="given-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="customer-whatsapp"
-                    className="text-sm font-medium text-blue-900"
-                  >
-                    Nomor Whatsapp
-                  </Label>
-                  <Input
-                    id="customer-whatsapp"
-                    placeholder="08xxxxxxxxxx"
-                    value={newCustomerWhatsapp}
-                    onChange={(e) => {
-                      setNewCustomerWhatsapp(e.target.value);
-                      if (customerValidationError)
-                        setCustomerValidationError("");
-                    }}
-                    className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    type="tel"
-                    autoComplete="tel"
-                    inputMode="numeric"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    onClick={handleAddCustomer}
-                    disabled={
-                      !newCustomerName.trim() || !newCustomerWhatsapp.trim()
-                    }
-                    className="bg-blue-600 hover:bg-blue-700 text-base h-12 min-h-[48px]"
-                  >
-                    Simpan Customer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setAddingCustomer(false);
-                      setNewCustomerName("");
-                      setNewCustomerWhatsapp("");
-                      setCustomerValidationError("");
-                    }}
-                    className="text-base h-12 min-h-[48px]"
-                  >
-                    Batal
-                  </Button>
+            {/* Treatment Selection */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="treatment"
+                className="text-sm font-semibold text-slate-700"
+              >
+                Pilih Treatment
+              </Label>
+              <Select
+                value={selectedTreatments
+                  .map((treatmentId) => {
+                    const treatment = treatments.find(
+                      (t) => t.id.toString() === treatmentId
+                    );
+                    return treatment
+                      ? {
+                          value: treatmentId,
+                          label: treatment.name,
+                        }
+                      : null;
+                  })
+                  .filter(Boolean)}
+                onChange={(selectedOptions) => {
+                  const values = selectedOptions
+                    ? selectedOptions
+                        .map((option) => option?.value)
+                        .filter((value): value is string => Boolean(value))
+                    : [];
+                  setSelectedTreatments(values);
+                }}
+                options={treatments.map((treatment) => ({
+                  value: treatment.id.toString(),
+                  label: treatment.name,
+                }))}
+                placeholder=""
+                isSearchable
+                isMulti
+                menuPlacement="auto"
+                maxMenuHeight={300}
+                menuPortalTarget={null}
+                filterOption={(candidate, input) => {
+                  // Always show all options, no filtering limit
+                  if (!input) return true;
+                  return candidate.label
+                    .toLowerCase()
+                    .includes(input.toLowerCase());
+                }}
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={{
+                  menuPortal: (provided) => ({
+                    ...provided,
+                    zIndex: 9999,
+                  }),
+                  menu: (provided) => ({
+                    ...provided,
+                    zIndex: 9999,
+                    fontSize: "16px",
+                  }),
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: "48px",
+                    fontSize: "16px",
+                  }),
+                }}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              className="text-base h-12 min-h-[48px] flex-1 sm:flex-none"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                !selectedCustomer?.id ||
+                selectedTreatments.length === 0 ||
+                !selectedCapster
+              }
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-base h-12 min-h-[48px] flex-1 sm:flex-none"
+            >
+              {isEditMode ? "Update Appointment" : "Simpan Appointment"}
+            </Button>
+          </DialogFooter>
+        </>
+      ) : (
+        // Modal konfirmasi setelah submit berhasil
+        <>
+          <DialogHeader>
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
+              <div className="bg-gradient-to-br from-green-100 to-green-200 p-2 rounded-xl">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+              </div>
+              <span className="text-base sm:text-xl">
+                {isEditMode
+                  ? "Appointment Berhasil Diupdate!"
+                  : "Appointment Berhasil Disimpan!"}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-slate-600">
+              Appointment untuk {selectedCustomer?.name} telah berhasil{" "}
+              {isEditMode ? "diupdate" : "ditambahkan"}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6">
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="p-4 sm:p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-100 p-2 rounded-full">
+                      <User className="w-4 h-4 text-green-700" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-green-900 text-sm sm:text-base">
+                        {selectedCustomer?.name}
+                      </p>
+                      <p className="text-xs sm:text-sm text-green-700">
+                        {selectedCustomer?.whatsapp}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-100 p-2 rounded-full">
+                      <Scissors className="w-4 h-4 text-green-700" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-green-900 text-sm sm:text-base">
+                        Treatment:{" "}
+                        {selectedTreatments
+                          .map((treatmentId) => {
+                            const treatment = treatments.find(
+                              (t) => t.id.toString() === treatmentId
+                            );
+                            return treatment?.name;
+                          })
+                          .join(", ")}
+                      </p>
+                      <p className="text-xs sm:text-sm text-green-700">
+                        Capster:{" "}
+                        {
+                          capsters.find(
+                            (c) => c.id.toString() === selectedCapster
+                          )?.name
+                        }
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          )}
-        </div>
+          </div>
 
-        {/* Treatment Selection */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="treatment"
-            className="text-sm font-semibold text-slate-700"
-          >
-            Pilih Treatment
-          </Label>
-          <Select
-            value={selectedTreatments
-              .map((treatmentId) => {
-                const treatment = treatments.find(
-                  (t) => t.id.toString() === treatmentId
-                );
-                return treatment
-                  ? {
-                      value: treatmentId,
-                      label: treatment.name,
-                    }
-                  : null;
-              })
-              .filter(Boolean)}
-            onChange={(selectedOptions) => {
-              const values = selectedOptions
-                ? selectedOptions
-                    .map((option) => option?.value)
-                    .filter((value): value is string => Boolean(value))
-                : [];
-              setSelectedTreatments(values);
-            }}
-            options={treatments.map((treatment) => ({
-              value: treatment.id.toString(),
-              label: treatment.name,
-            }))}
-            placeholder=""
-            isSearchable
-            isMulti
-            menuPlacement="auto"
-            maxMenuHeight={300}
-            menuPortalTarget={null}
-            filterOption={(candidate, input) => {
-              // Always show all options, no filtering limit
-              if (!input) return true;
-              return candidate.label
-                .toLowerCase()
-                .includes(input.toLowerCase());
-            }}
-            className="react-select-container"
-            classNamePrefix="react-select"
-            styles={{
-              menuPortal: (provided) => ({
-                ...provided,
-                zIndex: 9999,
-              }),
-              menu: (provided) => ({
-                ...provided,
-                zIndex: 9999,
-                fontSize: "16px",
-              }),
-              control: (provided) => ({
-                ...provided,
-                minHeight: "48px",
-                fontSize: "16px",
-              }),
-            }}
-          />
-        </div>
-      </div>
-
-      <DialogFooter className="gap-3 pt-4">
-        <Button
-          variant="outline"
-          onClick={handleClose}
-          className="text-base h-12 min-h-[48px] flex-1 sm:flex-none"
-        >
-          Batal
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={
-            !selectedCustomer?.id ||
-            selectedTreatments.length === 0 ||
-            !selectedCapster
-          }
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-base h-12 min-h-[48px] flex-1 sm:flex-none"
-        >
-          Simpan Appointment
-        </Button>
-      </DialogFooter>
+          <DialogFooter className="gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={handleEditOrAdd}
+              className="text-base h-12 min-h-[48px] flex-1 sm:flex-none bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Edit/Tambah Lagi
+            </Button>
+            <Button
+              onClick={handleFinish}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-base h-12 min-h-[48px] flex-1 sm:flex-none"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Selesai
+            </Button>
+          </DialogFooter>
+        </>
+      )}
     </DialogContent>
   );
 }

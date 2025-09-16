@@ -209,13 +209,66 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Base font size yang lebih besar untuk tablet */
+    font-size: 16px;
+  }
+
+  /* Font sizes yang diperbesar untuk tablet */
+  h1 {
+    font-size: 2.5rem;
+  }
+  h2 {
+    font-size: 2rem;
+  }
+  h3 {
+    font-size: 1.75rem;
+  }
+  h4 {
+    font-size: 1.5rem;
+  }
+
+  /* Text utilities yang lebih besar */
+  .text-xs {
+    font-size: 0.875rem;
+  }
+  .text-sm {
+    font-size: 1rem;
+  }
+  .text-base {
+    font-size: 1.125rem;
+  }
+  .text-lg {
+    font-size: 1.25rem;
+  }
+  .text-xl {
+    font-size: 1.375rem;
+  }
+  .text-2xl {
+    font-size: 1.625rem;
+  }
+
+  /* Input dan button padding yang lebih besar */
+  input,
+  textarea,
+  select,
+  button {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+
+  /* Table cells padding yang lebih besar */
+  td,
+  th {
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
   }
 }
 
 /* React Select Styling */
 .react-select-container .react-select__control {
-  @apply min-h-[42px] border-border rounded-md bg-background hover:border-ring;
+  @apply min-h-[48px] border-border rounded-md bg-background hover:border-ring;
   box-shadow: none !important;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__control--is-focused {
@@ -229,26 +282,33 @@
   flex-wrap: wrap !important;
   align-items: flex-start !important;
   gap: 4px !important;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__placeholder {
   @apply text-muted-foreground;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__single-value {
   @apply text-foreground;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__input-container {
   @apply text-foreground;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__menu {
   @apply bg-popover border border-border rounded-md shadow-lg;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__option {
   @apply text-foreground cursor-pointer;
+  padding: 0.75rem 1rem !important;
+  font-size: 1rem !important;
 }
 
 .react-select-container .react-select__option--is-focused {
@@ -271,17 +331,19 @@
   @apply bg-primary text-primary-foreground rounded-md;
   margin: 2px !important;
   max-width: calc(100% - 4px) !important;
-  font-size: 0.75rem !important;
+  font-size: 0.875rem !important;
 }
 
 .react-select-container .react-select__multi-value__label {
-  @apply text-primary-foreground px-2 py-1 text-sm;
-  font-size: 0.75rem !important;
+  @apply text-primary-foreground px-2 py-1;
+  font-size: 0.875rem !important;
   font-weight: 500 !important;
+  padding: 0.5rem 0.75rem !important;
 }
 
 .react-select-container .react-select__multi-value__remove {
   @apply text-primary-foreground hover:bg-destructive hover:text-white rounded-r-md px-1;
+  padding: 0.5rem !important;
 }
 
 .react-select-container .react-select__clear-indicator {

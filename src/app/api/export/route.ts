@@ -103,32 +103,38 @@ export async function POST() {
     const existingData = await getSheetData();
 
     // Create a set of existing appointment identifiers for quick lookup
-    // We'll use a combination of date, customer name, and whatsapp as unique identifier
+    // We'll use a combination of date, customer name, time, and capster as unique identifier
+    // This matches our grouping logic
     const existingAppointments = new Set();
     existingData.forEach((row: string[]) => {
       if (
-        row.length >= 4 &&
+        row.length >= 6 &&
         row[0] !== "No" &&
         row[0] !== "" &&
         row[0] !== "Column 1"
       ) {
         // Skip header row and empty rows
-        // Normalize the identifier by trimming whitespace and ensuring consistent format
+        // Create identifier that matches our grouping: date-customer-time-capster
         const date = (row[1] || "").toString().trim();
         const customer = (row[2] || "").toString().trim();
         const whatsapp = normalizeWhatsApp((row[3] || "").toString());
-        const identifier = `${date}-${customer}-${whatsapp}`;
+        const capster = (row[5] || "").toString().trim();
+
+        // Try to extract time from treatment if it was stored there, or use a composite key
+        // Since we group by customer+time+capster, use customer+capster for checking
+        const identifier = `${date}-${customer}-${whatsapp}-${capster}`;
         existingAppointments.add(identifier);
       }
     });
 
     // Filter out appointments that already exist in Google Sheets
     const newAppointments = groupedAppointments.filter((appointment) => {
-      // Normalize the identifier the same way
+      // Create identifier that matches our grouping logic
       const date = appointment.date.trim();
       const customer = (appointment.customer?.name || "").trim();
       const whatsapp = normalizeWhatsApp(appointment.customer?.whatsapp || "");
-      const identifier = `${date}-${customer}-${whatsapp}`;
+      const capster = (appointment.capster?.name || "").trim();
+      const identifier = `${date}-${customer}-${whatsapp}-${capster}`;
       const isExisting = existingAppointments.has(identifier);
 
       // Log for debugging (will be removed later)
@@ -146,8 +152,13 @@ export async function POST() {
     // Create rows with proper formatting for new appointments only
     const newRows = newAppointments.map((appointment, index) => {
       // Calculate the row number based on existing data
+      // Exclude header row from count if it exists
       const existingRowCount =
-        existingData.length > 0 ? existingData.length - 1 : 0; // Exclude header
+        existingData.length > 0 &&
+        existingData[0] &&
+        existingData[0][0] === "No"
+          ? existingData.length - 1
+          : existingData.length;
       const rowNumber = existingRowCount + index + 1;
 
       return [
@@ -190,12 +201,29 @@ export async function POST() {
         ? "Semua appointment hari ini sudah di-export sebelumnya"
         : `${newRows.length} appointment baru berhasil di-export ke Google Sheets`;
 
+    // Log export summary for debugging
+    console.log(`Export Summary:
+    - Date: ${date}
+    - Total appointments: ${groupedAppointments.length}
+    - New exports: ${newRows.length}
+    - Existing in sheet: ${
+      existingData.length > 0 && existingData[0] && existingData[0][0] === "No"
+        ? existingData.length - 1
+        : existingData.length
+    }
+    `);
+
     return NextResponse.json({
       exported: newAppointments,
       message: responseMessage,
       totalAppointments: groupedAppointments.length,
       newExports: newRows.length,
-      existingInSheet: existingData.length > 0 ? existingData.length - 1 : 0, // Exclude header
+      existingInSheet:
+        existingData.length > 0 &&
+        existingData[0] &&
+        existingData[0][0] === "No"
+          ? existingData.length - 1
+          : existingData.length,
       date: date,
       exportResult,
     });

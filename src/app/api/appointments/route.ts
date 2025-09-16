@@ -18,6 +18,8 @@ export async function GET(req: Request) {
   const dd = String(targetDate.getDate()).padStart(2, "0");
   const date = `${yyyy}-${mm}-${dd}`;
 
+  console.log("GET appointments for date:", date);
+
   const { data, error } = await supabase
     .from("appointments")
     .select(
@@ -30,6 +32,8 @@ export async function GET(req: Request) {
     )
     .eq("date", date)
     .order("time", { ascending: false });
+
+  console.log("GET appointments result:", { data: data?.length || 0, error });
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
