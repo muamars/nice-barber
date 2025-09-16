@@ -748,6 +748,21 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerValidationError, setCustomerValidationError] = useState("");
 
+  // Enhanced close function that resets form
+  const handleClose = () => {
+    // Reset all form state
+    setSelectedCapster("");
+    setSelectedTreatments([]);
+    setCustomerQuery("");
+    setCustomers([]);
+    setSelectedCustomer(null);
+    setAddingCustomer(false);
+    setNewCustomerName("");
+    setNewCustomerWhatsapp("");
+    setCustomerValidationError("");
+    onClose();
+  };
+
   useEffect(() => {
     fetch("/api/masters")
       .then((r) => r.json())
@@ -856,11 +871,11 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
     );
 
     await Promise.all(appointmentPromises);
-    onClose();
+    handleClose();
   }
 
   return (
-    <DialogContent className="sm:max-w-2xl max-w-[95vw] max-h-[90vh] overflow-y-auto z-50">
+    <DialogContent className="sm:max-w-2xl max-w-[98vw] w-full max-h-[95vh] overflow-y-auto z-50 mx-2 sm:mx-auto">
       <DialogHeader>
         <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
           <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-2 rounded-xl">
@@ -910,6 +925,42 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
               menu: (provided) => ({
                 ...provided,
                 zIndex: 1000,
+                fontSize: "16px", // Prevent zoom on iOS
+              }),
+              control: (provided, state) => ({
+                ...provided,
+                minHeight: "48px", // Larger touch target
+                fontSize: "16px", // Prevent zoom on iOS
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.5rem",
+                "&:hover": {
+                  borderColor: "#cbd5e1",
+                },
+                ...(state.isFocused && {
+                  borderColor: "#3b82f6",
+                  boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)",
+                }),
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                padding: "12px 16px", // Larger touch targets
+                fontSize: "16px",
+                ...(state.isSelected && {
+                  backgroundColor: "#3b82f6",
+                }),
+                ...(state.isFocused &&
+                  !state.isSelected && {
+                    backgroundColor: "#eff6ff",
+                  }),
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                fontSize: "16px",
+                color: "#9ca3af",
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                fontSize: "16px",
               }),
             }}
             menuPortalTarget={null}
@@ -924,55 +975,78 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
 
           {!addingCustomer ? (
             <div className="space-y-4">
-              <Select
-                value={
-                  selectedCustomer
-                    ? {
-                        value: selectedCustomer.id.toString(),
-                        label: `${selectedCustomer.name} (${selectedCustomer.whatsapp})`,
-                      }
-                    : null
-                }
-                onChange={(option) => {
-                  if (option) {
-                    const customer = customers.find(
-                      (c) => c.id.toString() === option.value
-                    );
-                    if (customer) {
-                      setSelectedCustomer(customer);
-                    }
-                  } else {
-                    setSelectedCustomer(null);
-                  }
-                }}
-                onInputChange={(inputValue) => setCustomerQuery(inputValue)}
-                options={customers.map((customer) => ({
-                  value: customer.id.toString(),
-                  label: `${customer.name} (${customer.whatsapp})`,
-                }))}
-                placeholder="Cari customer atau ketik nama untuk menambah baru"
-                isSearchable
-                isClearable
-                isLoading={loadingCustomers}
-                className="react-select-container"
-                classNamePrefix="react-select"
-                styles={{
-                  menuPortal: (provided) => ({
-                    ...provided,
-                    zIndex: 1000,
-                  }),
-                  menu: (provided) => ({
-                    ...provided,
-                    zIndex: 1000,
-                  }),
-                }}
-                menuPortalTarget={null}
-                noOptionsMessage={({ inputValue }) =>
-                  inputValue
-                    ? `Tidak ditemukan "${inputValue}"`
-                    : "Ketik untuk mencari customer"
-                }
-              />
+              {/* Custom Customer Search Input */}
+              <div className="relative">
+                <div className="relative">
+                  <Input
+                    placeholder="Cari customer..."
+                    value={customerQuery}
+                    onChange={(e) => setCustomerQuery(e.target.value)}
+                    className="w-full pr-10 text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    autoComplete="off"
+                  />
+                  {loadingCustomers && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                    </div>
+                  )}
+                  {customerQuery && !loadingCustomers && (
+                    <button
+                      onClick={() => {
+                        setCustomerQuery("");
+                        setCustomers([]);
+                        setSelectedCustomer(null);
+                      }}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Search Results Dropdown */}
+                {customerQuery && customers.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {customers.map((customer) => (
+                      <button
+                        key={customer.id}
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setCustomerQuery("");
+                          setCustomers([]);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-b-0 focus:bg-blue-50 focus:outline-none transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="bg-blue-100 p-2 rounded-full flex-shrink-0">
+                            <User className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 text-sm sm:text-base truncate">
+                              {customer.name}
+                            </p>
+                            <p className="text-xs sm:text-sm text-slate-600 truncate">
+                              {customer.whatsapp}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* No Results Message */}
+                {customerQuery &&
+                  !loadingCustomers &&
+                  customers.length === 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4 text-center">
+                      <p className="text-sm text-slate-600">
+                        Tidak ditemukan customer dengan nama &ldquo;
+                        {customerQuery}&rdquo;
+                      </p>
+                    </div>
+                  )}
+              </div>
 
               {selectedCustomer && (
                 <Card className="border-green-200 bg-green-50">
@@ -998,7 +1072,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                 <Button
                   variant="outline"
                   onClick={() => setAddingCustomer(true)}
-                  className="flex items-center gap-2 text-sm"
+                  className="flex items-center justify-center gap-2 text-base h-12 min-h-[48px]"
                 >
                   <Plus className="w-4 h-4" />
                   Tambah Customer Baru
@@ -1007,7 +1081,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                   <Button
                     variant="outline"
                     onClick={() => setSelectedCustomer(null)}
-                    className="text-sm"
+                    className="text-base h-12 min-h-[48px]"
                   >
                     Reset Pilihan
                   </Button>
@@ -1042,7 +1116,8 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                       if (customerValidationError)
                         setCustomerValidationError("");
                     }}
-                    className="bg-white text-sm"
+                    className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    autoComplete="given-name"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1061,7 +1136,10 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                       if (customerValidationError)
                         setCustomerValidationError("");
                     }}
-                    className="bg-white text-sm"
+                    className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="numeric"
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1070,7 +1148,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                     disabled={
                       !newCustomerName.trim() || !newCustomerWhatsapp.trim()
                     }
-                    className="bg-blue-600 hover:bg-blue-700 text-sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-base h-12 min-h-[48px]"
                   >
                     Simpan Customer
                   </Button>
@@ -1082,7 +1160,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                       setNewCustomerWhatsapp("");
                       setCustomerValidationError("");
                     }}
-                    className="text-sm"
+                    className="text-base h-12 min-h-[48px]"
                   >
                     Batal
                   </Button>
@@ -1149,13 +1227,14 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
               menu: (provided) => ({
                 ...provided,
                 zIndex: 1000,
+                fontSize: "16px", // Prevent zoom on iOS
               }),
               control: (provided, state) => ({
                 ...provided,
-                minHeight: "auto",
+                minHeight: "48px", // Larger touch target
+                fontSize: "16px", // Prevent zoom on iOS
                 border: "1px solid #e2e8f0",
                 borderRadius: "0.5rem",
-                fontSize: "0.875rem",
                 "&:hover": {
                   borderColor: "#cbd5e1",
                 },
@@ -1169,19 +1248,25 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                 backgroundColor: "#eff6ff",
                 border: "1px solid #dbeafe",
                 borderRadius: "0.375rem",
-                fontSize: "0.75rem",
-                margin: "1px 2px",
+                fontSize: "14px",
+                margin: "2px",
+                minHeight: "32px", // Larger touch targets for tags
               }),
               multiValueLabel: (provided) => ({
                 ...provided,
                 color: "#1e40af",
                 fontWeight: "500",
-                padding: "2px 6px",
-                fontSize: "0.75rem",
+                padding: "4px 8px",
+                fontSize: "14px",
               }),
               multiValueRemove: (provided) => ({
                 ...provided,
                 color: "#3b82f6",
+                minWidth: "32px", // Larger touch target for remove button
+                minHeight: "32px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 "&:hover": {
                   backgroundColor: "#dbeafe",
                   color: "#1e40af",
@@ -1189,19 +1274,32 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
               }),
               valueContainer: (provided) => ({
                 ...provided,
-                padding: "6px 8px",
+                padding: "8px 12px",
                 flexWrap: "wrap",
-                gap: "2px",
+                gap: "4px",
               }),
               placeholder: (provided) => ({
                 ...provided,
                 color: "#9ca3af",
-                fontSize: "0.875rem",
+                fontSize: "16px",
               }),
               input: (provided) => ({
                 ...provided,
-                margin: 0,
-                padding: 0,
+                margin: "0",
+                padding: "0",
+                fontSize: "16px",
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                padding: "12px 16px", // Larger touch targets
+                fontSize: "16px",
+                ...(state.isSelected && {
+                  backgroundColor: "#3b82f6",
+                }),
+                ...(state.isFocused &&
+                  !state.isSelected && {
+                    backgroundColor: "#eff6ff",
+                  }),
               }),
             }}
           />
@@ -1209,7 +1307,11 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
       </div>
 
       <DialogFooter className="gap-3 pt-4">
-        <Button variant="outline" onClick={onClose} className="text-sm">
+        <Button
+          variant="outline"
+          onClick={handleClose}
+          className="text-base h-12 min-h-[48px] flex-1 sm:flex-none"
+        >
           Batal
         </Button>
         <Button
@@ -1219,7 +1321,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
             selectedTreatments.length === 0 ||
             !selectedCapster
           }
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-sm"
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-base h-12 min-h-[48px] flex-1 sm:flex-none"
         >
           Simpan Appointment
         </Button>
