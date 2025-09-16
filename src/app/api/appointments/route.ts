@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     `
     )
     .eq("date", date)
-    .order("time", { ascending: true });
+    .order("time", { ascending: false });
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });

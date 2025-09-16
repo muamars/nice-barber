@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import Logo from "@/assets/NICE.png";
 import Image from "next/image";
@@ -68,6 +70,12 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isExporting, setIsExporting] = useState(false);
+  const [showExportResult, setShowExportResult] = useState(false);
+  const [exportResult, setExportResult] = useState<{
+    success: boolean;
+    message: string;
+    exportedCount?: number;
+  } | null>(null);
 
   // Function to group appointments by customer, time, and capster
   function groupAppointments(
@@ -162,21 +170,31 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         console.log("Export successful:", data);
-        alert(
-          `Export berhasil! ${
+        setExportResult({
+          success: true,
+          message: `Export berhasil! ${
             data.exported?.length || 0
-          } appointment telah dikirim ke Google Sheets.`
-        );
+          } appointment telah dikirim ke Google Sheets.`,
+          exportedCount: data.exported?.length || 0,
+        });
+        setShowExportResult(true);
       } else {
         const errorData = await res.json();
         console.error("Export failed:", errorData);
-        alert(`Export gagal: ${errorData.error || "Unknown error"}`);
+        setExportResult({
+          success: false,
+          message: `Export gagal: ${errorData.error || "Unknown error"}`,
+        });
+        setShowExportResult(true);
       }
     } catch (exportError) {
       console.error("Export error:", exportError);
-      alert(
-        "Terjadi kesalahan saat export ke Google Sheets. Periksa console untuk detail."
-      );
+      setExportResult({
+        success: false,
+        message:
+          "Terjadi kesalahan saat export ke Google Sheets. Periksa console untuk detail.",
+      });
+      setShowExportResult(true);
     } finally {
       setIsExporting(false);
     }
@@ -267,13 +285,28 @@ export default function Home() {
                   </p>
                   <p className="text-xl sm:text-2xl lg:text-3xl font-bold">
                     {appointments.length > 0
-                      ? appointments[appointments.length - 1]?.time || "-"
+                      ? (() => {
+                          // Find appointment with latest time (ascending order)
+                          const latestAppointment = appointments
+                            .slice()
+                            .sort((a, b) => a.time.localeCompare(b.time))
+                            .pop();
+                          return latestAppointment?.time || "-";
+                        })()
                       : "-"}
                   </p>
                   <p className="text-emerald-200 text-xs mt-1 truncate max-w-[100px] sm:max-w-none">
                     {appointments.length > 0
-                      ? appointments[appointments.length - 1]?.customer?.name ||
-                        "Belum ada"
+                      ? (() => {
+                          // Find appointment with latest time (ascending order)
+                          const latestAppointment = appointments
+                            .slice()
+                            .sort((a, b) => a.time.localeCompare(b.time))
+                            .pop();
+                          return (
+                            latestAppointment?.customer?.name || "Belum ada"
+                          );
+                        })()
                       : "Belum ada"}
                   </p>
                 </div>
@@ -489,6 +522,70 @@ export default function Home() {
                         load();
                       }}
                     />
+                  </Dialog>
+
+                  {/* Export Result Modal */}
+                  <Dialog
+                    open={showExportResult}
+                    onOpenChange={setShowExportResult}
+                  >
+                    <DialogContent className="sm:max-w-md max-w-[95vw] mx-4">
+                      <DialogHeader>
+                        <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-3">
+                          <div
+                            className={`p-2 rounded-xl ${
+                              exportResult?.success
+                                ? "bg-green-100"
+                                : "bg-red-100"
+                            }`}
+                          >
+                            {exportResult?.success ? (
+                              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                            ) : (
+                              <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
+                            )}
+                          </div>
+                          <span className="text-base sm:text-lg">
+                            {exportResult?.success
+                              ? "Export Berhasil"
+                              : "Export Gagal"}
+                          </span>
+                        </DialogTitle>
+                      </DialogHeader>
+
+                      <div className="py-4">
+                        <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+                          {exportResult?.message}
+                        </p>
+                        {exportResult?.success &&
+                          exportResult?.exportedCount !== undefined && (
+                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <div className="bg-green-100 p-1.5 rounded-md">
+                                  <User className="w-3.5 h-3.5 text-green-600" />
+                                </div>
+                                <span className="text-sm font-medium text-green-900">
+                                  {exportResult.exportedCount} appointment
+                                  berhasil diekspor
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          onClick={() => setShowExportResult(false)}
+                          className={`w-full sm:w-auto ${
+                            exportResult?.success
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-red-600 hover:bg-red-700"
+                          } text-white`}
+                        >
+                          Tutup
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
                   </Dialog>
                   <button
                     onClick={() => load()}
@@ -748,6 +845,21 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerValidationError, setCustomerValidationError] = useState("");
 
+  // Enhanced close function that resets form
+  const handleClose = () => {
+    // Reset all form state
+    setSelectedCapster("");
+    setSelectedTreatments([]);
+    setCustomerQuery("");
+    setCustomers([]);
+    setSelectedCustomer(null);
+    setAddingCustomer(false);
+    setNewCustomerName("");
+    setNewCustomerWhatsapp("");
+    setCustomerValidationError("");
+    onClose();
+  };
+
   useEffect(() => {
     fetch("/api/masters")
       .then((r) => r.json())
@@ -856,11 +968,11 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
     );
 
     await Promise.all(appointmentPromises);
-    onClose();
+    handleClose();
   }
 
   return (
-    <DialogContent className="sm:max-w-2xl max-w-[95vw] max-h-[90vh] overflow-y-auto z-50">
+    <DialogContent className="sm:max-w-2xl max-w-[95vw] w-full max-h-[95vh] overflow-y-auto z-50 sm:mx-auto">
       <DialogHeader>
         <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
           <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-2 rounded-xl">
@@ -905,11 +1017,17 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
             styles={{
               menuPortal: (provided) => ({
                 ...provided,
-                zIndex: 1000,
+                zIndex: 9999,
               }),
               menu: (provided) => ({
                 ...provided,
-                zIndex: 1000,
+                zIndex: 9999,
+                fontSize: "16px",
+              }),
+              control: (provided) => ({
+                ...provided,
+                minHeight: "48px",
+                fontSize: "16px",
               }),
             }}
             menuPortalTarget={null}
@@ -950,7 +1068,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                   value: customer.id.toString(),
                   label: `${customer.name} (${customer.whatsapp})`,
                 }))}
-                placeholder="Cari customer atau ketik nama untuk menambah baru"
+                placeholder="Pilih Customer"
                 isSearchable
                 isClearable
                 isLoading={loadingCustomers}
@@ -959,18 +1077,24 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                 styles={{
                   menuPortal: (provided) => ({
                     ...provided,
-                    zIndex: 1000,
+                    zIndex: 9999,
                   }),
                   menu: (provided) => ({
                     ...provided,
-                    zIndex: 1000,
+                    zIndex: 9999,
+                    fontSize: "16px",
+                  }),
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: "48px",
+                    fontSize: "16px",
                   }),
                 }}
                 menuPortalTarget={null}
                 noOptionsMessage={({ inputValue }) =>
                   inputValue
                     ? `Tidak ditemukan "${inputValue}"`
-                    : "Ketik untuk mencari customer"
+                    : "Cari customer"
                 }
               />
 
@@ -998,7 +1122,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                 <Button
                   variant="outline"
                   onClick={() => setAddingCustomer(true)}
-                  className="flex items-center gap-2 text-sm"
+                  className="flex items-center justify-center gap-2 text-base h-12 min-h-[48px]"
                 >
                   <Plus className="w-4 h-4" />
                   Tambah Customer Baru
@@ -1007,7 +1131,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                   <Button
                     variant="outline"
                     onClick={() => setSelectedCustomer(null)}
-                    className="text-sm"
+                    className="text-base h-12 min-h-[48px]"
                   >
                     Reset Pilihan
                   </Button>
@@ -1042,7 +1166,8 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                       if (customerValidationError)
                         setCustomerValidationError("");
                     }}
-                    className="bg-white text-sm"
+                    className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    autoComplete="given-name"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1061,7 +1186,10 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                       if (customerValidationError)
                         setCustomerValidationError("");
                     }}
-                    className="bg-white text-sm"
+                    className="bg-white text-base h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="numeric"
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1070,7 +1198,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                     disabled={
                       !newCustomerName.trim() || !newCustomerWhatsapp.trim()
                     }
-                    className="bg-blue-600 hover:bg-blue-700 text-sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-base h-12 min-h-[48px]"
                   >
                     Simpan Customer
                   </Button>
@@ -1082,7 +1210,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                       setNewCustomerWhatsapp("");
                       setCustomerValidationError("");
                     }}
-                    className="text-sm"
+                    className="text-base h-12 min-h-[48px]"
                   >
                     Batal
                   </Button>
@@ -1098,7 +1226,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
             htmlFor="treatment"
             className="text-sm font-semibold text-slate-700"
           >
-            Pilih Treatment (Multiple)
+            Pilih Treatment
           </Label>
           <Select
             value={selectedTreatments
@@ -1144,64 +1272,17 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
             styles={{
               menuPortal: (provided) => ({
                 ...provided,
-                zIndex: 1000,
+                zIndex: 9999,
               }),
               menu: (provided) => ({
                 ...provided,
-                zIndex: 1000,
+                zIndex: 9999,
+                fontSize: "16px",
               }),
-              control: (provided, state) => ({
+              control: (provided) => ({
                 ...provided,
-                minHeight: "auto",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.5rem",
-                fontSize: "0.875rem",
-                "&:hover": {
-                  borderColor: "#cbd5e1",
-                },
-                ...(state.isFocused && {
-                  borderColor: "#3b82f6",
-                  boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)",
-                }),
-              }),
-              multiValue: (provided) => ({
-                ...provided,
-                backgroundColor: "#eff6ff",
-                border: "1px solid #dbeafe",
-                borderRadius: "0.375rem",
-                fontSize: "0.75rem",
-                margin: "1px 2px",
-              }),
-              multiValueLabel: (provided) => ({
-                ...provided,
-                color: "#1e40af",
-                fontWeight: "500",
-                padding: "2px 6px",
-                fontSize: "0.75rem",
-              }),
-              multiValueRemove: (provided) => ({
-                ...provided,
-                color: "#3b82f6",
-                "&:hover": {
-                  backgroundColor: "#dbeafe",
-                  color: "#1e40af",
-                },
-              }),
-              valueContainer: (provided) => ({
-                ...provided,
-                padding: "6px 8px",
-                flexWrap: "wrap",
-                gap: "2px",
-              }),
-              placeholder: (provided) => ({
-                ...provided,
-                color: "#9ca3af",
-                fontSize: "0.875rem",
-              }),
-              input: (provided) => ({
-                ...provided,
-                margin: 0,
-                padding: 0,
+                minHeight: "48px",
+                fontSize: "16px",
               }),
             }}
           />
@@ -1209,7 +1290,11 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
       </div>
 
       <DialogFooter className="gap-3 pt-4">
-        <Button variant="outline" onClick={onClose} className="text-sm">
+        <Button
+          variant="outline"
+          onClick={handleClose}
+          className="text-base h-12 min-h-[48px] flex-1 sm:flex-none"
+        >
           Batal
         </Button>
         <Button
@@ -1219,7 +1304,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
             selectedTreatments.length === 0 ||
             !selectedCapster
           }
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-sm"
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-base h-12 min-h-[48px] flex-1 sm:flex-none"
         >
           Simpan Appointment
         </Button>
