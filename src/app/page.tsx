@@ -1010,7 +1010,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
               value: capster.id.toString(),
               label: capster.name,
             }))}
-            placeholder="Pilih capster yang tersedia"
+            placeholder=""
             isSearchable
             className="react-select-container"
             classNamePrefix="react-select"
@@ -1068,7 +1068,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                   value: customer.id.toString(),
                   label: `${customer.name} (${customer.whatsapp})`,
                 }))}
-                placeholder="Pilih Customer"
+                placeholder=""
                 isSearchable
                 isClearable
                 isLoading={loadingCustomers}
@@ -1254,7 +1254,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
               value: treatment.id.toString(),
               label: treatment.name,
             }))}
-            placeholder="Pilih satu atau beberapa treatment"
+            placeholder=""
             isSearchable
             isMulti
             menuPlacement="auto"
