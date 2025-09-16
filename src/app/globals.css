@@ -214,7 +214,7 @@
 
 /* React Select Styling */
 .react-select-container .react-select__control {
-  @apply h-12 border-border rounded-md bg-background hover:border-ring;
+  @apply min-h-[42px] border-border rounded-md bg-background hover:border-ring;
   box-shadow: none !important;
 }
 
@@ -225,6 +225,10 @@
 
 .react-select-container .react-select__value-container {
   @apply px-3 py-2;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
 }
 
 .react-select-container .react-select__placeholder {
@@ -265,10 +269,15 @@
 
 .react-select-container .react-select__multi-value {
   @apply bg-primary text-primary-foreground rounded-md;
+  margin: 2px !important;
+  max-width: calc(100% - 4px) !important;
+  font-size: 0.75rem !important;
 }
 
 .react-select-container .react-select__multi-value__label {
   @apply text-primary-foreground px-2 py-1 text-sm;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
 }
 
 .react-select-container .react-select__multi-value__remove {

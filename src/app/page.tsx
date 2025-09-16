@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -950,7 +950,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                   value: customer.id.toString(),
                   label: `${customer.name} (${customer.whatsapp})`,
                 }))}
-                placeholder="Cari customer atau ketik nama untuk menambah baru"
+                placeholder=""
                 isSearchable
                 isClearable
                 isLoading={loadingCustomers}
@@ -970,7 +970,7 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
                 noOptionsMessage={({ inputValue }) =>
                   inputValue
                     ? `Tidak ditemukan "${inputValue}"`
-                    : "Ketik untuk mencari customer"
+                    : "Cari customer"
                 }
               />
 
@@ -1149,59 +1149,6 @@ function AddAppointmentModal({ onClose }: { onClose: () => void }) {
               menu: (provided) => ({
                 ...provided,
                 zIndex: 1000,
-              }),
-              control: (provided, state) => ({
-                ...provided,
-                minHeight: "auto",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.5rem",
-                fontSize: "0.875rem",
-                "&:hover": {
-                  borderColor: "#cbd5e1",
-                },
-                ...(state.isFocused && {
-                  borderColor: "#3b82f6",
-                  boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)",
-                }),
-              }),
-              multiValue: (provided) => ({
-                ...provided,
-                backgroundColor: "#eff6ff",
-                border: "1px solid #dbeafe",
-                borderRadius: "0.375rem",
-                fontSize: "0.75rem",
-                margin: "1px 2px",
-              }),
-              multiValueLabel: (provided) => ({
-                ...provided,
-                color: "#1e40af",
-                fontWeight: "500",
-                padding: "2px 6px",
-                fontSize: "0.75rem",
-              }),
-              multiValueRemove: (provided) => ({
-                ...provided,
-                color: "#3b82f6",
-                "&:hover": {
-                  backgroundColor: "#dbeafe",
-                  color: "#1e40af",
-                },
-              }),
-              valueContainer: (provided) => ({
-                ...provided,
-                padding: "6px 8px",
-                flexWrap: "wrap",
-                gap: "2px",
-              }),
-              placeholder: (provided) => ({
-                ...provided,
-                color: "#9ca3af",
-                fontSize: "0.875rem",
-              }),
-              input: (provided) => ({
-                ...provided,
-                margin: 0,
-                padding: 0,
               }),
             }}
           />
