@@ -937,6 +937,9 @@ function AddAppointmentModal({
   const [customerValidationError, setCustomerValidationError] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [createdAppointmentIds, setCreatedAppointmentIds] = useState<number[]>(
+    []
+  );
 
   // Enhanced close function that resets form
   const handleClose = () => {
@@ -953,18 +956,26 @@ function AddAppointmentModal({
     setCustomerValidationError("");
     setShowConfirmation(false);
     setIsEditMode(false);
+    setCreatedAppointmentIds([]);
     onClose();
   };
 
   useEffect(() => {
-    // Fetch masters data when component mounts or when returning from confirmation
+    // Fetch masters data when component mounts
+    console.log("Fetching masters data...");
     fetch("/api/masters")
       .then((r) => r.json())
       .then((d) => {
+        console.log("Masters data loaded:", d);
+        console.log("Treatments:", d.treatments);
+        console.log("Capsters:", d.capsters);
         setTreatments(d.treatments || []);
         setCapsters(d.capsters || []);
+      })
+      .catch((error) => {
+        console.error("Error loading masters data:", error);
       });
-  }, [showConfirmation]); // Re-fetch when showConfirmation changes
+  }, []); // Only fetch once when component mounts
 
   // Load appointment data for editing when editingAppointmentId is set
   useEffect(() => {
@@ -1191,7 +1202,20 @@ function AddAppointmentModal({
         const hasErrors = results.some((res) => !res.ok);
 
         if (!hasErrors) {
-          console.log("Appointments created successfully");
+          // Extract appointment IDs from responses
+          const appointmentData = await Promise.all(
+            results.map((res) => res.json())
+          );
+          const newAppointmentIds = appointmentData
+            .flat()
+            .map((apt) => apt.id)
+            .filter(Boolean);
+
+          console.log(
+            "Appointments created successfully with IDs:",
+            newAppointmentIds
+          );
+          setCreatedAppointmentIds(newAppointmentIds);
           setShowConfirmation(true);
         } else {
           console.error("Some appointments failed to create");
@@ -1204,19 +1228,19 @@ function AddAppointmentModal({
     }
   }
 
-  // Fungsi untuk button "Edit/Tambah" - reset form untuk appointment baru atau tetap di mode edit
+  // Fungsi untuk button "Edit/Tambah" - setelah create, ubah ke mode edit
   function handleEditOrAdd() {
     setShowConfirmation(false);
 
-    if (isEditMode) {
-      // Jika dalam mode edit, biarkan data tetap ada untuk kemudahan edit lebih lanjut
-      // User bisa edit lagi appointment yang sama
-    } else {
-      // Jika mode tambah baru, reset form kecuali customer (untuk kemudahan user)
-      setSelectedTreatments([]);
-      setSelectedCapster("");
-      // Biarkan customer tetap terpilih untuk kemudahan
+    if (!isEditMode && createdAppointmentIds.length > 0) {
+      // Jika baru saja create appointment, ubah ke mode edit
+      // Gunakan ID appointment yang baru dibuat untuk editing
+      setIsEditMode(true);
+      // Set editingAppointmentId ke parent component agar bisa diedit
+      // Data form (selectedCustomer, selectedTreatments, selectedCapster) tetap ada
+      console.log("Switching to edit mode with IDs:", createdAppointmentIds);
     }
+    // Jika sudah dalam mode edit, biarkan data tetap ada untuk edit lebih lanjut
   }
 
   // Fungsi untuk button "Selesai" - tutup modal dan reload data
@@ -1619,22 +1643,25 @@ function AddAppointmentModal({
                     <div>
                       <p className="font-semibold text-green-900 text-sm sm:text-base">
                         Treatment:{" "}
-                        {selectedTreatments
-                          .map((treatmentId) => {
-                            const treatment = treatments.find(
-                              (t) => t.id.toString() === treatmentId
-                            );
-                            return treatment?.name;
-                          })
-                          .join(", ")}
+                        {selectedTreatments.length > 0 && treatments.length > 0
+                          ? selectedTreatments
+                              .map((treatmentId) => {
+                                const treatment = treatments.find(
+                                  (t) => t.id.toString() === treatmentId
+                                );
+                                return treatment?.name;
+                              })
+                              .filter(Boolean)
+                              .join(", ")
+                          : "Loading..."}
                       </p>
                       <p className="text-xs sm:text-sm text-green-700">
                         Capster:{" "}
-                        {
-                          capsters.find(
-                            (c) => c.id.toString() === selectedCapster
-                          )?.name
-                        }
+                        {selectedCapster && capsters.length > 0
+                          ? capsters.find(
+                              (c) => c.id.toString() === selectedCapster
+                            )?.name || "Not found"
+                          : "Loading..."}
                       </p>
                     </div>
                   </div>
